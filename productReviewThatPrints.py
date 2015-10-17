@@ -29,8 +29,6 @@ def cleandata(mtext):
     #mtext = re.sub('', '', mtext)
     mtext = re.sub(' -', '.', mtext)
     mtext = re.sub(' \.', '.', mtext)
-    #work on .2)
-    mtext = re.sub('\.[0-9]\)', '. ', mtext)
     #mtext = re.sub('\.\.+', '. ', mtext)
     mtext = re.sub('(?<=\\D)\.(?=\\D)', '. ', mtext)
     mtext = ''.join([i if ord(i) < 128 else ' ' for i in mtext])
@@ -156,22 +154,17 @@ def best_bigram_word_feats(words, score_fn=BigramAssocMeasures.chi_sq, n=200):
     d.update(best_word_feats(words))
     return d
  
-print 'evaluating best words + bigram chi_sq word features'
-#mc = evaluate_classifier(best_bigram_word_feats)
+##mc = evaluate_classifier(best_bigram_word_feats)
 
-
-#with open("myClassifier", "wb") as f:
-    #pickle.dump(mc, f);
 with open("myClassifier", "rb") as f:
     mc = pickle.load(f);
-
 
 
 # # Defining features DS
 
 # In[16]:
 
-features2 = [('Cpu/Processor/qualcomm/exynos/mediatek/snapdragon', ''),
+features = [('Cpu/Processor/qualcomm/exynos/mediatek/snapdragon', ''),
             ('Screen/Display', 'size/inch,resolution/ppi,type/ips/amoled'),
             ('Battery', 'standby,life/day/hour/hrs/usage'),
             ('Camera','front/selfie/secondary,rear/back/primary,flash,low light'),
@@ -180,27 +173,6 @@ features2 = [('Cpu/Processor/qualcomm/exynos/mediatek/snapdragon', ''),
             ('Build/Design','metal/plastic/glass'),
             ('Heat/temperature', '')]
 
-features = [('Cpu/Processor/qualcomm/exynos/mediatek/snapdragon', 'game,play,core,quad,octa,multitask'),
-            ('Screen/Display', 'touch,size,inch,resolution,ppi,type,ips,amoled'),
-            ('Battery', 'charge,backup,standby,life,day,hour,hrs,usage'),
-            ('Camera','front,selfie,secondary,rear,back,primary,flash,low light,record'),
-            ('RAM/Memory', 'storage,expandable,sdcard,card,available,internal,apps,ram,external'),
-            ('Audio/Sound/Speaker/volume', 'front,earpiece,call,back,loud,music,song,earphone,headphone,volume'),
-            ('Build/Design','metal,plastic,glass,hardware'),
-            ('sim', 'dual,sim'),
-            ('2g/3g/4g/wifi/blueooth', '2g,3g,4g,wifi,blueooth'),
-            ('service','customer'),
-            ('android/ ios /windows/lollipop/ os /kitkat','android, ios ,windows,lollipop, os ,kitkat,update,upgrade,version'),
-            ('price/money/budget/cost',''),
-            ('Heat/temperature', '')]
-
-filterout = ['flipkart', ' rs.', 'google play services']
-
-def checkfilterout(sent):
-    for f in filterout:
-        if f in sent:
-            return False
-    return True
 
 # # Functions for doing the classification
 # ## We use the classifier we created earlier
@@ -242,7 +214,7 @@ def sentanalysis(text):
         tokens = nltk.word_tokenize(sent)
         #tokens = [t for t in tokens if t not in stpwrds]
         #print 'tokens: ', tokens 
-        if len(set(tokens))>1 and checkfilterout(sent):
+        if len(set(tokens))>1:
             d = best_bigram_word_feats(tokens)
             #d = {}
             #for word in tokens:
@@ -259,23 +231,22 @@ def sentanalysis(text):
 #E.g. of format of f: ('Camera', 'front/selfie/secondary,rear/back/primary')
 def findByF(f, items, d, ispro):
     #print items
-    n = 0
     subfs = f[1].split(',')
     primf = f[0]
     flist = primf.split('/')
     dd = {}
     if not d.has_key(primf):
-        d[primf] = {} 
+    	d[primf] = {} 
     if ispro:
-        d[primf]['pros'] = dd
+    	d[primf]['pros'] = dd
     else:
-        d[primf]['cons'] = dd
+    	d[primf]['cons'] = dd
     subf_items = {k:[] for k in subfs}
     general_items = []
     count = 0
     for i in items:  
         #first check if item is talking about the feature
-        if any([fi.lower() in i[0] for fi in flist]):
+        if any([fi.lower().strip() in i[0] for fi in flist]):
             count+=1
             #print ('\t\t\t# '+i[0])
             hasSF = False
@@ -283,29 +254,30 @@ def findByF(f, items, d, ispro):
             if subfs != ['']:              
                 for sf in subfs:
                     sflist = sf.split('/')
-                    if any([sfi.lower() in i[0] for sfi in sflist]):
+                    if any([sfi.lower().strip() in i[0] for sfi in sflist]):
                         subf_items[sf].append(i)
                         hasSF = True
                     
             if not hasSF:          
                 general_items.append(i)
     
-    ###print "(" + str(count) + "):"
+    print "(" + str(count) + "):"
     
     for sf in subf_items:
         subf_items[sf].sort(key=score, reverse=True)
         if subf_items[sf]!=[]:
-            ###print '\t\t' + sf + ' (' + str(len(subf_items[sf])) + "):"
-            ###for item in subf_items[sf]:
-                ###print '\t\t\t\t> ' + item[0]
+            print '\t\t' + sf + ' (' + str(len(subf_items[sf])) + "):"
+            for item in subf_items[sf]:
+                print '\t\t\t\t> ' + item[0]
             dd[sf] = [item[0] for item in subf_items[sf]]
     #dd.update(subf_items)
     if general_items != []:
         general_items.sort(key=score, reverse=True)
-        ###print '\t\tGeneral (' + str(len(general_items)) + "):"
+        print '\t\tGeneral (' + str(len(general_items)) + "):"
         dd['general'] = [item[0] for item in general_items]
-        ###for item in general_items:
-            ###print '\t\t\t\t> ' + item[0]
+        for item in general_items:
+            print '\t\t\t\t> ' + item[0]
+
     return count
     
 def thefunction(mtext, d):
@@ -334,23 +306,20 @@ def printByFeatures(pros, cons, d):
     totscore = 0
     norm = 0
     for f in features:
-        #print "---------------"
-        #print(f[0])
-        #print("\tPROS"),
+        print "---------------"
+        print(f[0])
+        print("\tPROS"),
         np = findByF(f, pros, d, True)
-        #print("\tCONS"),
+        print("\tCONS"),
         nc = findByF(f, cons, d, False)
         if nc!=0 or np!=0: 
             fscore = np*10.0/(nc+np)
-            #fscore = int(fscore+0.5)/2.0
+            fscore = int(fscore+0.5)/2.0
             totscore+=fscore
-            norm+=10
-            
-            d[f[0]]['score'] = round(fscore * 2) / 2
+            norm+=5
+            print("\tScore: "+str(fscore))
     if totscore!=0:
-        totscore = totscore*10.0/norm
-        d['overall score'] = round(totscore * 2) / 2
-
+        print("Final Score: "+str((int(totscore*2/neg_score))/2.0))
     #print("\n\tALLPROS (" + str(len(pros)) + "):")
     #printAll(pros)
     #print("\n\tALLCONS (" + str(len(cons)) + "):")
@@ -360,24 +329,32 @@ def printByFeatures(pros, cons, d):
 # # Getting input from file
 # ###Run this whenever data is changed
 
+# In[44]:
+
 mtextfile = io.open("test.txt", "r", encoding='utf-8')
 mtext = mtextfile.read()
 mtextfile.close()
 
 #matches = tool.check(mtext)
-#mtext = cleandata(mtext)
+
+
+mtext = cleandata(mtext)
+
+
+# In[45]:
+
 #print (mtext)
 #print "Language errors:", len(matches)
-#thefunction(mtext, d)
+d = {}
+thefunction(mtext, d)
 
 
-def makedict(mytext):
-    mytext = cleandata(mytext)
-    d = {}
-    thefunction(mytext, d)
-    #print 245
-    #pprint.pprint(d)
-    #print 2
-    return d
+# In[ ]:
+
+#def makedict(mytext):
+	#mytext = cleandata(mytext)
+	#d = {}
+	#thefunction(mytext, d)
+	#return d
 
 #pprint.pprint(makedict(mtext))
